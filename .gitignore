@@ -1,0 +1,16 @@
+# Spicetify bloat
+**/spicetify/Backup/
+**/spicetify/Work/
+**/spicetify/extracted/
+
+# Neovim temp files
+**/nvim/.netrwhist
+**/nvim/undo/
+**/nvim/shada/
+
+# System noise
+**/*.log
+**/*.state
+.DS_Store
+
+**/DankMaterialShell/**/.git/

@@ -1,0 +1,27 @@
+[config]
+
+[templates.spotify]
+input_path = '~/.config/matugen/templates/spotify.ini'
+output_path = '~/.config/matugen/generated/spotify.ini'
+post_hook = '''
+ln -nfs $HOME/.config/matugen/generated/spotify.ini $HOME/.config/spicetify/Themes/marketplace/color.ini;
+spicetify apply -n;
+hyprctl dispatch sendshortcut "CTRL SHIFT, R, class:^(spotify)$"
+'''
+
+[templates.btop]
+input_path = '~/.config/matugen/templates/btop.theme'
+output_path = '~/.config/matugen/generated/btop-colors.theme'
+post_hook = 'mkdir -p $HOME/.config/btop/themes; ln -nfs $HOME/.config/matugen/generated/btop-colors.theme $HOME/.config/btop/themes/matugen.theme'
+
+
+[templates.cava]
+input_path = '~/.config/matugen/templates/cava-colors.ini'
+output_path = '~/.config/matugen/generated/cava-colors.ini'
+post_hook = 'mkdir -p $HOME/.config/cava/themes; ln -nfs $HOME/.config/matugen/generated/cava-colors.ini $HOME/.config/cava/themes/cava-colors.ini; pkill -USR1 cava || true'
+
+
+[templates.fastfetch]
+input_path = '~/.config/matugen/templates/fastfetch.jsonc'
+output_path = '~/.config/matugen/generated/fastfetch.jsonc'
+post_hook = 'ln -nfs $HOME/.config/matugen/generated/fastfetch.jsonc $HOME/.config/fastfetch/config.jsonc'
