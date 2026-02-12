@@ -168,13 +168,20 @@ migrate_config_package() {
     for item in $files; do
         local basename_item
         basename_item=$(basename "$item")
+        
+        # Skip empty directories (git can't track them)
+        if [ -d "$item" ] && [ -z "$(ls -A "$item")" ]; then
+            echo "    Skipping empty dir: $basename_item"
+            continue
+        fi
+        
         echo "    Moving: $basename_item"
         run_cmd "git -C '$REPO_DIR' mv '$item' '$package_dir/'"
     done
     
-    # Remove the now-empty nested directories
-    run_cmd "rmdir '$nested_path'" 
-    run_cmd "rmdir '$package_dir/.config'"
+    # Remove the now-empty nested directories (use rm -rf to handle any leftover empty dirs)
+    run_cmd "rm -rf '$nested_path'" 
+    run_cmd "rm -rf '$package_dir/.config'"
     
     # Create proxy symlink using ABSOLUTE path to avoid symlink chain issues
     # package/.config/package -> $REPO_DIR/$package (absolute)
