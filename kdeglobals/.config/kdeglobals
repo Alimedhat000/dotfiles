@@ -1,4 +1,3 @@
-
 [ColorEffects:Disabled]
 ChangeSelectionColor=
 Color=56,56,56
@@ -134,8 +133,8 @@ ForegroundPositive=39,174,96
 ForegroundVisited=155,89,182
 
 [General]
-TerminalApplication=kitty
 ColorSchemeHash=9f63c7711a13123582e720791ea0f8c0172977d2
+TerminalApplication=kitty
 
 [KDE]
 LookAndFeelPackage=org.kde.breezedark.desktop

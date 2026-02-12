@@ -101,7 +101,7 @@ alias clone="git clone"
 alias img='kitten icat'
 
 alias mycloc='cloc --exclude-dir=node_modules,dist,build,.git,.vscode,.idea,coverage,.next,out,.vercel,.turbo,.cache --exclude-ext=json,log,txt,yml,yaml,lock,svg,png,jpg,jpeg,gif,ico,env . | ccze -A'
-alias loc='tokei . | ccze -A'
+alias loc='tokei .'
 
 alias clip='wl-copy' 
 alias clipp='wl-paste' 
@@ -114,6 +114,12 @@ alias poke='pokemon-colorscripts'
 alias cat='bat --theme="Visual Studio Dark+"'
 
 alias ff='fastfetch'
+
+alias http='curlie'
+
+alias open='xdg-open'
+
+#alias curl='curl --proto-default https'
 
 # Colorized output
 export LESS='-R'
@@ -130,20 +136,21 @@ mkcd() {
 typeset -A pomo_options
 pomo_options=(
   work 45
-  break 10
+  break 15
   emacs 30
 )
 
 pomodoro() {
-  if [[ -n "$1" && -n "${pomo_options[$1]}" ]]; then
+  if [[ -n $1 && -n ${pomo_options[$1]} ]]; then
     local val=$1
     timer "${pomo_options[$val]}m"
-    notify-send "'$val' session done"
+    notify-send "$val session done"
   fi
 }
+unalias wo br 2>/dev/null
 
-alias wo="pomodoro 'work'"
-alias br="pomodoro 'break'"
+wo() { pomodoro work }
+br() { pomodoro break }
 
 # pnpm fzf function
 _pnpm_fzf_run() {
@@ -218,4 +225,22 @@ export PATH=/usr/local/cuda/bin:$PATH
 export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
 export PATH=$PATH:/usr/local/go/bin
 export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/scripts:$PATH"
 
+export ANDROID_HOME=$HOME/Android/Sdk
+export PATH=$PATH:$ANDROID_HOME/emulator
+export PATH=$PATH:$ANDROID_HOME/platform-tools
+
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+
+export PYENV_ROOT="$HOME/.pyenv"
+[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"
+eval "$(pyenv init - bash)"
+
+export PATH="$HOME/.platformio/penv/bin:$PATH"
+
+eval "$(direnv hook zsh)"
+
+# opencode
+export PATH=/home/ali/.opencode/bin:$PATH
+export PATH=/home/ali/.cargo/bin/:$PATH

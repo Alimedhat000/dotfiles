@@ -1,8 +1,12 @@
 {
   "dankPomodoroTimer": {
     "enabled": true,
-    "completedPomodoros-2026-01-14": 3,
-    "completedPomodoros-2026-01-17": 1
+    "autoStartPomodoros": true,
+    "autoStartBreaks": true,
+    "workDuration": "45",
+    "shortBreakDuration": "15",
+    "longBreakDuration": "30",
+    "completedPomodoros-2026-02-06": 1
   },
   "emojiLauncher": {
     "enabled": true
@@ -15,7 +19,7 @@
   },
   "calculator": {
     "enabled": true,
-    "trigger": "=",
+    "trigger": "",
     "noTrigger": true
   },
   "dankLauncherKeys": {
@@ -27,5 +31,13 @@
   },
   "myPlugin": {
     "enabled": true
+  },
+  "gitmojiLauncher": {
+    "enabled": true
+  },
+  "vscodeLauncher": {
+    "enabled": true,
+    "trigger": "{",
+    "editorMode": "VSCode"
   }
 }
