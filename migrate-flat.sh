@@ -2,23 +2,20 @@
 #
 # migrate-flat.sh - Flatten nested dotfiles structure without breaking system
 #
-# Usage:
-#   ./migrate-flat.sh [--dry-run] [--package <name>] [--continue-from <package>]
+# Current structure:  nvim/.config/nvim/init.lua
+# Target structure:   nvim/init.lua (with proxy symlink nvim/.config/nvim -> ../..)
 #
-# Options:
-#   --dry-run         Show what would happen without making changes
-#   --package <name>  Migrate only a specific package
-#   --continue-from   Resume migration from a specific package
-#   --verify          Run verification checks only
-#   --help            Show this help message
+# The proxy symlink keeps stow working - existing symlinks in ~/.config/ will
+# follow through the proxy and still reach the config files.
+#
+# Usage: ./migrate-flat.sh [--dry-run]
 #
 
 set -euo pipefail
 
 REPO_DIR="${REPO_DIR:-$HOME/dotfiles}"
-BACKUP_FILE="$HOME/dotfiles-backup-$(date +%F).tar.gz"
+BACKUP_FILE="$HOME/dotfiles-backup-$(date +%F-%H%M%S).tar.gz"
 
-# Color output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -26,497 +23,377 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 DRY_RUN=false
-SINGLE_PACKAGE=""
-START_FROM=""
-VERIFY_ONLY=false
 
-# Package migration mapping: package -> target_path
-PACKAGES=(
-    "nvim:.config/nvim"
-    "kitty:.config/kitty"
-    "lazygit:.config/lazygit"
-    "mpv:.config/mpv"
-    "spicetify:.config/spicetify"
-    "gtk-3.0:.config/gtk-3.0"
-    "gtk-4.0:.config/gtk-4.0"
-    "matugen:.config/matugen"
-    "hypr:.config/hypr"
-    "dolphinrc:.config/dolphinrc"
-    "environment.d:.config/environment.d"
-    "mimeapps.list:.config/mimeapps.list"
-    "kdeglobals:.config/kdeglobals"
-    "btop:.config/btop"
-    "cava:.config/cava"
-    "pipewire:.config/pipewire"
-    "qt5ct:.config/qt5ct"
-    "qt6ct:.config/qt6ct"
-    "danksearch:.config/danksearch"
-    "DankMaterialShell:.config/DankMaterialShell"
-)
+# Parse arguments
+for arg in "$@"; do
+    case $arg in
+        --dry-run)
+            DRY_RUN=true
+            ;;
+    esac
+done
 
-# ============================================================================
-# HELPER FUNCTIONS
-# ============================================================================
-
-log_info() { echo -e "${BLUE}[INFO]${NC} $*"; }
+log_info()    { echo -e "${BLUE}[INFO]${NC} $*"; }
 log_success() { echo -e "${GREEN}[OK]${NC} $*"; }
-log_warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
-log_error() { echo -e "${RED}[ERROR]${NC} $*"; }
+log_warn()    { echo -e "${YELLOW}[WARN]${NC} $*"; }
+log_error()   { echo -e "${RED}[ERROR]${NC} $*"; }
 
 run_cmd() {
     if [ "$DRY_RUN" = true ]; then
-        echo -e "${YELLOW}[DRY-RUN]${NC} $*"
+        echo -e "  ${YELLOW}[DRY-RUN]${NC} $*"
+        return 0
     else
-        echo "[EXEC] $*"
         eval "$@"
     fi
 }
 
-confirm() {
-    local msg="$1"
-    if [ "$DRY_RUN" = true ]; then
-        log_info "Would confirm: $msg"
-        return 0
-    fi
-    read -p "$msg [y/N] " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        log_warn "Skipped: $msg"
-        return 1
-    fi
-    return 0
-}
-
-check_git_clean() {
-    if ! git -C "$REPO_DIR" diff --quiet 2>/dev/null; then
-        log_warn "Uncommitted changes detected. Consider committing first."
-        if ! confirm "Continue with uncommitted changes?"; then
-            exit 1
-        fi
-    fi
-}
-
-# ============================================================================
-# BACKUP & SAFETY
-# ============================================================================
-
 create_backup() {
     log_info "Creating backup: $BACKUP_FILE"
-    run_cmd "git -C '$REPO_DIR' archive HEAD | gzip > '$BACKUP_FILE'"
-    log_success "Backup created"
-}
-
-ensure_safety_branch() {
     if [ "$DRY_RUN" = true ]; then
-        log_info "Would create safety branch: flatten-safety"
-        return 0
-    fi
-    
-    if ! git -C "$REPO_DIR" rev-parse --verify flatten-safety >/dev/null 2>&1; then
-        log_info "Creating safety branch..."
-        git -C "$REPO_DIR" checkout -b flatten-safety
-        git -C "$REPO_DIR" commit -a -m "safety: snapshot before flattening $(date +%F)"
-        log_success "Safety branch created"
+        echo -e "  ${YELLOW}[DRY-RUN]${NC} git archive HEAD | gzip > '$BACKUP_FILE'"
     else
-        log_info "Safety branch already exists"
+        git -C "$REPO_DIR" archive HEAD | gzip > "$BACKUP_FILE"
+        log_success "Backup created: $BACKUP_FILE"
     fi
 }
 
-# ============================================================================
-# MIGRATION FUNCTIONS
-# ============================================================================
+ensure_clean_repo() {
+    if [ "$DRY_RUN" = true ]; then
+        return 0
+    fi
+    
+    if ! git -C "$REPO_DIR" diff --quiet 2>/dev/null; then
+        log_error "Repository has uncommitted changes. Commit or stash them first."
+        exit 1
+    fi
+}
 
-migrate_package() {
-    local package="$1"
-    local target="$2"
-    local source_dir="$REPO_DIR/$package"
-    local target_dir="$REPO_DIR/$target"
+create_migration_branch() {
+    local branch_name="flatten-migration"
     
-    log_info "Migrating: $package → $target"
-    
-    # Check if source exists
-    if [ ! -d "$source_dir" ]; then
-        log_warn "Source directory not found: $source_dir"
+    if [ "$DRY_RUN" = true ]; then
+        log_info "Would create branch: $branch_name"
         return 0
     fi
     
-    # Find files to migrate - get them as absolute paths
-    local files
-    files=$(find "$source_dir" -type f 2>/dev/null)
+    local current_branch
+    current_branch=$(git -C "$REPO_DIR" branch --show-current)
     
-    if [ -z "$files" ]; then
-        log_warn "No files found in $source_dir"
+    # Check if we're already on the migration branch
+    if [ "$current_branch" = "$branch_name" ]; then
+        log_info "Already on branch: $branch_name"
         return 0
     fi
     
-    # Count files
-    local count
-    count=$(echo "$files" | wc -l)
-    echo "  Files to migrate ($count)"
-    
-    # Create target directory
-    run_cmd "mkdir -p '$target_dir'"
-    
-    # Migrate each file - strip the leading package/.config/package/ from the path
-    while IFS= read -r file; do
-        # Get relative path from source_dir
-        local rel="${file#$source_dir/}"
-        
-        # Strip the leading .config/package/ prefix
-        local prefix=".config/${package}"
-        if [[ "$rel" == "$prefix/"* ]]; then
-            rel="${rel#$prefix/}"
+    # Check if branch already exists
+    if git -C "$REPO_DIR" rev-parse --verify "$branch_name" >/dev/null 2>&1; then
+        log_warn "Branch '$branch_name' already exists"
+        read -p "Switch to it and continue? [y/N] " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            git -C "$REPO_DIR" checkout "$branch_name"
+            log_success "Switched to branch: $branch_name"
+        else
+            log_error "Aborted. Delete the branch or use a different name."
+            exit 1
         fi
-        
-        local target_file="$target_dir/$rel"
-        local target_subdir
-        target_subdir="$(dirname "$target_file")"
-        
-        run_cmd "mkdir -p '$target_subdir'"
-        run_cmd "git mv '$file' '$target_file' 2>/dev/null || cp -a '$file' '$target_file'"
-        
-    done <<< "$files"
-    
-    # Remove empty source directories (keep package directory itself)
-    if [ "$DRY_RUN" = false ]; then
-        find "$source_dir" -type d -empty -delete 2>/dev/null || true
-    fi
-    
-    # Create proxy symlink at old location pointing to new location
-    local config_subdir="$source_dir/.config/$(basename "$target")"
-    if [ -d "$source_dir/.config" ] && [ ! -e "$config_subdir" ]; then
-        local proxy_target="../../$target"
-        log_info "Creating proxy symlink: $config_subdir → $proxy_target"
-        run_cmd "ln -s '$proxy_target' '$config_subdir'"
-    fi
-    
-    # Commit
-    if [ "$DRY_RUN" = false ]; then
-        git -C "$REPO_DIR" add -A
-        git -C "$REPO_DIR" commit -m "flatten: move $package to $target"
-        log_success "Committed: $package → $target"
+    else
+        log_info "Creating branch: $branch_name (from $current_branch)"
+        git -C "$REPO_DIR" checkout -b "$branch_name"
+        log_success "Created and switched to branch: $branch_name"
     fi
 }
 
-migrate_direct_file() {
+# Migrate a .config package: nvim/.config/nvim/* -> nvim/*
+# Creates proxy symlink: nvim/.config/nvim -> ../..
+migrate_config_package() {
     local package="$1"
-    local target="$2"
-    local source="$REPO_DIR/$package/.config/$package"
-    local target_file="$REPO_DIR/$target"
+    local package_dir="$REPO_DIR/$package"
+    local nested_path="$package_dir/.config/$package"
     
-    log_info "Migrating: $package/.config/$package → $target"
+    log_info "Migrating: $package"
     
-    if [ ! -f "$source" ]; then
-        log_warn "Source file not found: $source"
+    # Check if already migrated (proxy symlink exists)
+    if [ -L "$nested_path" ]; then
+        log_info "  Already migrated (proxy symlink exists)"
         return 0
     fi
     
-    # Create target directory
-    run_cmd "mkdir -p '$(dirname "$target_file")'"
-    
-    # Move file
-    run_cmd "git mv '$source' '$target_file'"
-    
-    # Remove empty directories
-    run_cmd "rmdir '$REPO_DIR/$package/.config' 2>/dev/null || true"
-    
-    # Create proxy symlink at old location
-    run_cmd "mkdir -p '$REPO_DIR/$package/.config'"
-    run_cmd "ln -s ../../$target '$REPO_DIR/$package/.config/$package'"
-    
-    # Commit
-    if [ "$DRY_RUN" = false ]; then
-        git -C "$REPO_DIR" add -A
-        git -C "$REPO_DIR" commit -m "flatten: move $package to $target"
-        log_success "Committed: $package → $target"
-    fi
-}
-
-migrate_zsh() {
-    local source="$REPO_DIR/zsh/.zshrc"
-    local target="$REPO_DIR/.zshrc"
-    
-    log_info "Migrating: zsh/.zshrc → .zshrc"
-    
-    if [ ! -f "$source" ]; then
-        log_warn "Source file not found: $source"
+    # Check if this is a single-file package (e.g., dolphinrc/.config/dolphinrc is a file)
+    if [ -f "$nested_path" ]; then
+        echo "  Structure: $package/.config/$package (file) -> $package/$package"
+        
+        local basename_file
+        basename_file=$(basename "$nested_path")
+        echo "    Moving: $basename_file"
+        run_cmd "git -C '$REPO_DIR' mv '$nested_path' '$package_dir/'"
+        
+        # Remove the now-empty .config directory
+        run_cmd "rmdir '$package_dir/.config'"
+        
+        # Create proxy symlink: package/.config -> ..
+        # So package/.config/dolphinrc -> ../dolphinrc
+        run_cmd "ln -s '..' '$package_dir/.config'"
+        
+        # Stage the symlink
+        run_cmd "git -C '$REPO_DIR' add '$package_dir/.config'"
+        
+        # Commit this package
+        if [ "$DRY_RUN" = false ]; then
+            git -C "$REPO_DIR" add -A
+            git -C "$REPO_DIR" commit -m "flatten: $package/.config/$package -> $package/$package"
+            log_success "  Committed"
+        fi
         return 0
     fi
     
-    # Move file
-    run_cmd "git mv '$source' '$target'"
-    
-    # Remove empty directories
-    run_cmd "rmdir '$REPO_DIR/zsh/.config' 2>/dev/null || true"
-    
-    # Create proxy symlink at old location
-    run_cmd "ln -s ../.zshrc '$REPO_DIR/zsh/.zshrc'"
-    
-    # Commit
-    if [ "$DRY_RUN" = false ]; then
-        git -C "$REPO_DIR" add -A
-        git -C "$REPO_DIR" commit -m "flatten: move zsh/.zshrc to .zshrc"
-        log_success "Committed: zsh → .zshrc"
-    fi
-}
-
-migrate_system() {
-    local source_dir="$REPO_DIR/system"
-    local target_dir="$REPO_DIR/.config"
-    
-    log_info "Migrating: system/ → .config/"
-    
-    if [ ! -d "$source_dir" ]; then
-        log_warn "Source directory not found: $source_dir"
+    # Check if this package has the nested directory structure
+    if [ ! -d "$nested_path" ]; then
+        log_warn "  Skipping: no nested structure at $package/.config/$package"
         return 0
     fi
     
-    # Find files to migrate
+    echo "  Structure: $package/.config/$package/* -> $package/*"
+    
+    # List files to move
     local files
-    files=$(find "$source_dir/.config" -type f 2>/dev/null)
+    files=$(find "$nested_path" -mindepth 1 -maxdepth 1 2>/dev/null)
     
     if [ -z "$files" ]; then
-        log_warn "No files found in $source_dir"
+        log_warn "  No files found in $nested_path"
         return 0
     fi
     
-    echo "  Files to migrate:"
-    while IFS= read -r file; do
-        local rel="${file#$source_dir/}"
-        echo "    - $rel"
-    done <<< "$files"
+    # Move each file/directory up to package root
+    for item in $files; do
+        local basename_item
+        basename_item=$(basename "$item")
+        echo "    Moving: $basename_item"
+        run_cmd "git -C '$REPO_DIR' mv '$item' '$package_dir/'"
+    done
     
-    # Create target directory
-    run_cmd "mkdir -p '$target_dir'"
+    # Remove the now-empty nested directories
+    run_cmd "rmdir '$nested_path'" 
+    run_cmd "rmdir '$package_dir/.config'"
     
-    # Move files
-    while IFS= read -r file; do
-        local rel="${file#$source_dir/}"
-        local target_file="$target_dir/$rel"
-        run_cmd "git mv '$file' '$target_file' 2>/dev/null || cp -a '$file' '$target_file'"
-    done <<< "$files"
+    # Create proxy symlink: package/.config/package -> ../..
+    # This makes stow symlinks continue to work
+    run_cmd "mkdir -p '$package_dir/.config'"
+    run_cmd "ln -s '../..' '$package_dir/.config/$package'"
     
-    # Remove empty directories
-    if [ "$DRY_RUN" = false ]; then
-        find "$source_dir" -type d -empty -delete 2>/dev/null || true
-    fi
+    # Stage the symlink
+    run_cmd "git -C '$REPO_DIR' add '$package_dir/.config/$package'"
     
-    # Create proxy symlink at old location
-    run_cmd "ln -s ../../.config '$source_dir/.config'"
-    
-    # Commit
+    # Commit this package
     if [ "$DRY_RUN" = false ]; then
         git -C "$REPO_DIR" add -A
-        git -C "$REPO_DIR" commit -m "flatten: move system/ to .config/"
-        log_success "Committed: system → .config/"
+        git -C "$REPO_DIR" commit -m "flatten: $package/.config/$package -> $package"
+        log_success "  Committed"
     fi
 }
 
-# ============================================================================
-# VERIFICATION
-# ============================================================================
+# Migrate zsh: zsh/.zshrc is already flat, nothing to do
+migrate_zsh() {
+    local zsh_dir="$REPO_DIR/zsh"
+    
+    log_info "Checking: zsh"
+    
+    if [ ! -d "$zsh_dir" ]; then
+        log_warn "  zsh directory not found"
+        return 0
+    fi
+    
+    # Check if .zshrc exists directly in zsh/
+    if [ -f "$zsh_dir/.zshrc" ]; then
+        log_info "  Already flat (zsh/.zshrc exists)"
+        return 0
+    fi
+    
+    # Check for weird nested structure
+    if [ -f "$zsh_dir/.config/.zshrc" ]; then
+        log_info "  Moving zsh/.config/.zshrc -> zsh/.zshrc"
+        run_cmd "git -C '$REPO_DIR' mv '$zsh_dir/.config/.zshrc' '$zsh_dir/.zshrc'"
+        run_cmd "rmdir '$zsh_dir/.config' 2>/dev/null || true"
+        
+        if [ "$DRY_RUN" = false ]; then
+            git -C "$REPO_DIR" add -A
+            git -C "$REPO_DIR" commit -m "flatten: zsh/.config/.zshrc -> zsh/.zshrc"
+            log_success "  Committed"
+        fi
+    fi
+}
 
-verify_migration() {
-    log_info "Running verification checks..."
+# Migrate system: system/.config/* -> system/* with proxy
+migrate_system() {
+    local system_dir="$REPO_DIR/system"
+    local nested_dir="$system_dir/.config"
     
-    local failed=0
+    log_info "Migrating: system"
     
-    # Check symlinks resolve correctly
-    local symlinks=(
+    if [ ! -d "$nested_dir" ]; then
+        log_warn "  No .config directory in system/"
+        return 0
+    fi
+    
+    # Check if already migrated
+    if [ -L "$nested_dir" ]; then
+        log_info "  Already migrated (proxy symlink exists)"
+        return 0
+    fi
+    
+    # Move files from system/.config/* to system/*
+    local files
+    files=$(find "$nested_dir" -mindepth 1 -maxdepth 1 2>/dev/null)
+    
+    if [ -z "$files" ]; then
+        log_warn "  No files in system/.config/"
+        return 0
+    fi
+    
+    for item in $files; do
+        local basename_item
+        basename_item=$(basename "$item")
+        echo "    Moving: $basename_item"
+        run_cmd "git -C '$REPO_DIR' mv '$item' '$system_dir/'"
+    done
+    
+    # Remove empty .config and create proxy symlink
+    run_cmd "rmdir '$nested_dir'"
+    run_cmd "ln -s '..' '$system_dir/.config'"
+    run_cmd "git -C '$REPO_DIR' add '$system_dir/.config'"
+    
+    if [ "$DRY_RUN" = false ]; then
+        git -C "$REPO_DIR" add -A
+        git -C "$REPO_DIR" commit -m "flatten: system/.config/* -> system/*"
+        log_success "  Committed"
+    fi
+}
+
+verify_symlinks() {
+    log_info "Verifying system symlinks still work..."
+    
+    local checks=(
+        "$HOME/.config/nvim"
         "$HOME/.config/hypr"
         "$HOME/.config/kitty"
-        "$HOME/.config/nvim"
-        "$HOME/.config/lazygit"
-        "$HOME/.config/mpv"
-        "$HOME/.config/spicetify"
-        "$HOME/.config/gtk-3.0"
-        "$HOME/.config/gtk-4.0"
-        "$HOME/.config/matugen"
-        "$HOME/.config/user-dirs.dirs"
         "$HOME/.zshrc"
     )
     
-    for symlink in "${symlinks[@]}"; do
-        if [ -L "$symlink" ]; then
-            local resolved
-            resolved=$(readlink -f "$symlink" 2>/dev/null || echo "BROKEN")
-            if [ -f "$resolved" ] || [ -d "$resolved" ]; then
-                log_success "$symlink → $resolved"
+    local all_ok=true
+    
+    for link in "${checks[@]}"; do
+        if [ -L "$link" ]; then
+            # Check if symlink resolves to something that exists
+            if [ -e "$link" ]; then
+                local target
+                target=$(readlink "$link")
+                log_success "  $link -> $target"
             else
-                log_error "$symlink → $resolved (BROKEN)"
-                ((failed++))
+                log_error "  $link -> BROKEN"
+                all_ok=false
             fi
-        elif [ -f "$symlink" ] || [ -d "$symlink" ]; then
-            log_info "$symlink (direct, not symlink)"
+        elif [ -e "$link" ]; then
+            log_info "  $link (not a symlink)"
         else
-            log_warn "$symlink (not found)"
+            log_warn "  $link (does not exist)"
         fi
     done
     
-    if [ $failed -gt 0 ]; then
-        log_error "$failed verification checks failed"
-        return 1
+    if [ "$all_ok" = true ]; then
+        log_success "All symlinks verified!"
+    else
+        log_error "Some symlinks are broken. You may need to run: stow -R <package>"
     fi
-    
-    log_success "All verification checks passed"
-    return 0
 }
 
-# ============================================================================
-# UPDATE INSTALL.SH
-# ============================================================================
-
-update_install_script() {
-    log_info "Updating install.sh to handle new structure..."
+show_result() {
+    echo
+    echo "========================================"
+    echo "  Result"
+    echo "========================================"
+    echo
+    echo "Before: nvim/.config/nvim/init.lua"
+    echo "After:  nvim/init.lua"
+    echo "        nvim/.config/nvim -> ../..  (proxy symlink)"
+    echo
+    echo "Your ~/.config/nvim symlink still works because:"
+    echo "  ~/.config/nvim -> ../dotfiles/nvim/.config/nvim -> ../.. -> nvim/"
+    echo
     
-    if [ "$DRY_RUN" = true ]; then
-        log_info "Would update install.sh"
-        return 0
+    local current_branch
+    current_branch=$(git -C "$REPO_DIR" branch --show-current)
+    if [ "$current_branch" = "flatten-migration" ]; then
+        echo "========================================"
+        echo "  Next Steps"
+        echo "========================================"
+        echo
+        echo "You're on branch: $current_branch"
+        echo
+        echo "If everything looks good:"
+        echo "  git checkout main && git merge flatten-migration"
+        echo
+        echo "Or if something went wrong:"
+        echo "  git checkout main  # abandon the branch"
+        echo
     fi
-    
-    cat >> "$REPO_DIR/install.sh" << 'EOF'
-
-# ============================================================================
-# NOTE (2026-02-12): Flat migration complete
-# ============================================================================
-# Config files have been moved to flat structure:
-#   - .config/<app>/ instead of <app>/.config/<app>/
-#   - .zshrc at repo root
-#   - .config/user-dirs.dirs from system/
-#
-# Proxy symlinks at old paths ensure backward compatibility.
-# Stow continues to work without changes.
-# ============================================================================
-EOF
-    
-    log_success "install.sh updated"
-}
-
-# ============================================================================
-# MAIN
-# ============================================================================
-
-usage() {
-    head -30 "$0" | tail -25
-    exit 0
-}
-
-parse_args() {
-    while [ $# -gt 0 ]; do
-        case "$1" in
-            --dry-run)
-                DRY_RUN=true
-                ;;
-            --package)
-                shift
-                SINGLE_PACKAGE="$1"
-                ;;
-            --continue-from)
-                shift
-                START_FROM="$1"
-                ;;
-            --verify)
-                VERIFY_ONLY=true
-                ;;
-            --help|-h)
-                usage
-                ;;
-            *)
-                log_error "Unknown option: $1"
-                usage
-                ;;
-        esac
-        shift
-    done
 }
 
 main() {
-    parse_args "$@"
-    
-    cd "$REPO_DIR"
-    
     echo "========================================"
-    echo "  Dotfiles Flat Migration Script"
+    echo "  Dotfiles Flatten Migration"
     echo "========================================"
-    echo
     echo "Repo: $REPO_DIR"
-    echo "Dry-run: $DRY_RUN"
-    echo "Single package: ${SINGLE_PACKAGE:-none}"
-    echo "Start from: ${START_FROM:-none}"
+    echo "Mode: $([ "$DRY_RUN" = true ] && echo 'DRY RUN' || echo 'LIVE')"
     echo
     
-    # Verification only mode
-    if [ "$VERIFY_ONLY" = true ]; then
-        verify_migration
-        exit $?
-    fi
-    
-    # Safety checks
-    check_git_clean
-    ensure_safety_branch
+    ensure_clean_repo
     create_backup
+    create_migration_branch
     
-    # Check if we should start from a specific package
-    local started=false
-    if [ -n "$START_FROM" ]; then
-        started=true
-        log_info "Starting from package: $START_FROM"
-    fi
+    # Packages with .config nesting
+    local packages=(
+        "nvim"
+        "kitty"
+        "hypr"
+        "lazygit"
+        "mpv"
+        "spicetify"
+        "gtk-3.0"
+        "gtk-4.0"
+        "matugen"
+        "btop"
+        "cava"
+        "pipewire"
+        "qt5ct"
+        "qt6ct"
+        "fastfetch"
+        "danksearch"
+        "DankMaterialShell"
+        "dolphinrc"
+        "environment.d"
+        "mimeapps.list"
+        "kdeglobals"
+    )
     
-    # Migrate regular packages
-    for mapping in "${PACKAGES[@]}"; do
-        local package="${mapping%%:*}"
-        local target="${mapping##*:}"
-        
-        # Skip if looking for specific package and not there yet
-        if [ -n "$START_FROM" ] && [ "$started" = false ]; then
-            if [ "$package" = "$START_FROM" ]; then
-                started=true
-            fi
-            continue
+    echo
+    for package in "${packages[@]}"; do
+        if [ -d "$REPO_DIR/$package" ]; then
+            migrate_config_package "$package"
         fi
-        
-        # Skip if filtering to single package
-        if [ -n "$SINGLE_PACKAGE" ] && [ "$package" != "$SINGLE_PACKAGE" ]; then
-            continue
-        fi
-        
-        migrate_package "$package" "$target"
     done
     
-    # Migrate mimeapps.list and kdeglobals (direct file mappings)
-    if [ -z "$SINGLE_PACKAGE" ] || [ "$SINGLE_PACKAGE" = "mimeapps.list" ]; then
-        migrate_direct_file "mimeapps.list" ".config/mimeapps.list"
-    fi
-    if [ -z "$SINGLE_PACKAGE" ] || [ "$SINGLE_PACKAGE" = "kdeglobals" ]; then
-        migrate_direct_file "kdeglobals" ".config/kdeglobals"
-    fi
-    
-    # Migrate zsh (if not filtered)
-    if [ -z "$SINGLE_PACKAGE" ] || [ "$SINGLE_PACKAGE" = "zsh" ]; then
-        migrate_zsh
-    fi
-    
-    # Migrate system (if not filtered)
-    if [ -z "$SINGLE_PACKAGE" ] || [ "$SINGLE_PACKAGE" = "system" ]; then
-        migrate_system
-    fi
-    
-    # Update install script
-    update_install_script
-    
-    # Final verification
     echo
-    verify_migration || true
+    migrate_zsh
+    migrate_system
     
     echo
-    log_success "Migration complete!"
-    echo
-    echo "Next steps:"
-    echo "  1. Test your applications (kitty, nvim, hypr, etc.)"
-    echo "  2. If issues arise, rollback with: git checkout flatten-safety"
-    echo "  3. Push changes when ready: git push origin flatten-migration"
-    echo
+    if [ "$DRY_RUN" = false ]; then
+        verify_symlinks
+        show_result
+    else
+        echo
+        log_info "Dry run complete. Run without --dry-run to apply changes."
+    fi
 }
 
 main "$@"
