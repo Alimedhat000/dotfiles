@@ -41,8 +41,8 @@ PACKAGES=(
     "gtk-4.0:.config/gtk-4.0"
     "matugen:.config/matugen"
     "hypr:.config/hypr"
-    "dolphinrc:.config/dolph "environment.d:.inrc"
-   config/environment.d"
+    "dolphinrc:.config/dolphinrc"
+    "environment.d:.config/environment.d"
     "mimeapps.list:.config/mimeapps.list"
     "kdeglobals:.config/kdeglobals"
     "btop:.config/btop"
@@ -53,16 +53,6 @@ PACKAGES=(
     "danksearch:.config/danksearch"
     "DankMaterialShell:.config/DankMaterialShell"
 )
-
-# Direct file mappings (not directories)
-DIRECT_FILES=(
-    "mimeapps.list:.config/mimeapps.list:mimeapps.list"
-    "kdeglobals:.config/kdeglobals:kdeglobals"
-)
-
-# Special cases
-ZSH_PACKAGE="zsh"
-SYSTEM_PACKAGE="system"
 
 # ============================================================================
 # HELPER FUNCTIONS
@@ -150,48 +140,49 @@ migrate_package() {
         return 0
     fi
     
-    # Find files to migrate (recursively)
+    # Find files to migrate - get them as absolute paths
     local files
-    files=$(find "$source_dir" -type f 2>/dev/null | sed "s|$source_dir/||" | grep -v '^$')
+    files=$(find "$source_dir" -type f 2>/dev/null)
     
     if [ -z "$files" ]; then
         log_warn "No files found in $source_dir"
         return 0
     fi
     
-    # Show files that will be migrated
+    # Count files
     local count
     count=$(echo "$files" | wc -l)
-    echo "  Files to migrate ($count):"
-    echo "$files" | head -10 | sed 's/^/    - /'
-    [ "$count" -gt 10 ] && echo "    ... and $((count - 10)) more"
+    echo "  Files to migrate ($count)"
     
     # Create target directory
     run_cmd "mkdir -p '$target_dir'"
     
-    # Move files - strip the leading package/.config/package/ pattern
-    echo "$files" | while read -r f; do
-        if [ -e "$source_dir/$f" ]; then
-            # Calculate relative path: remove leading package/.config/package/
-            local new_path="$f"
-            local prefix="${package}/.config/${package}"
-            if [[ "$f" == "$prefix/"* ]]; then
-                new_path="${f#$prefix/}"
-            fi
-            
-            local target_subdir
-            target_subdir="$(dirname "$target_dir/$new_path")"
-            run_cmd "mkdir -p '$target_subdir'"
-            run_cmd "git mv '$source_dir/$f' '$target_dir/$new_path' 2>/dev/null || cp -a '$source_dir/$f' '$target_dir/$new_path'"
+    # Migrate each file - strip the leading package/.config/package/ from the path
+    while IFS= read -r file; do
+        # Get relative path from source_dir
+        local rel="${file#$source_dir/}"
+        
+        # Strip the leading .config/package/ prefix
+        local prefix=".config/${package}"
+        if [[ "$rel" == "$prefix/"* ]]; then
+            rel="${rel#$prefix/}"
         fi
-    done
+        
+        local target_file="$target_dir/$rel"
+        local target_subdir
+        target_subdir="$(dirname "$target_file")"
+        
+        run_cmd "mkdir -p '$target_subdir'"
+        run_cmd "git mv '$file' '$target_file' 2>/dev/null || cp -a '$file' '$target_file'"
+        
+    done <<< "$files"
     
     # Remove empty source directories (keep package directory itself)
     if [ "$DRY_RUN" = false ]; then
         find "$source_dir" -type d -empty -delete 2>/dev/null || true
     fi
     
-    # Create proxy symlink at old location
+    # Create proxy symlink at old location pointing to new location
     local config_subdir="$source_dir/.config/$(basename "$target")"
     if [ -d "$source_dir/.config" ] && [ ! -e "$config_subdir" ]; then
         local proxy_target="../../$target"
@@ -282,7 +273,7 @@ migrate_system() {
     
     # Find files to migrate
     local files
-    files=$(find "$source_dir/.config" -type f 2>/dev/null | sed "s|$source_dir/||")
+    files=$(find "$source_dir/.config" -type f 2>/dev/null)
     
     if [ -z "$files" ]; then
         log_warn "No files found in $source_dir"
@@ -290,17 +281,20 @@ migrate_system() {
     fi
     
     echo "  Files to migrate:"
-    echo "$files" | sed 's/^/    - /'
+    while IFS= read -r file; do
+        local rel="${file#$source_dir/}"
+        echo "    - $rel"
+    done <<< "$files"
     
     # Create target directory
     run_cmd "mkdir -p '$target_dir'"
     
     # Move files
-    echo "$files" | while read -r f; do
-        if [ -e "$source_dir/$f" ]; then
-            run_cmd "git mv '$source_dir/$f' '$target_dir/$f' 2>/dev/null || cp -a '$source_dir/$f' '$target_dir/$f'"
-        fi
-    done
+    while IFS= read -r file; do
+        local rel="${file#$source_dir/}"
+        local target_file="$target_dir/$rel"
+        run_cmd "git mv '$file' '$target_file' 2>/dev/null || cp -a '$file' '$target_file'"
+    done <<< "$files"
     
     # Remove empty directories
     if [ "$DRY_RUN" = false ]; then
@@ -490,23 +484,13 @@ main() {
         migrate_package "$package" "$target"
     done
     
-    # Migrate direct file mappings
-    for mapping in "${DIRECT_FILES[@]}"; do
-        IFS=':' read -r package target source <<< "$mapping"
-        
-        if [ -n "$START_FROM" ] && [ "$started" = false ]; then
-            if [ "$package" = "$START_FROM" ]; then
-                started=true
-            fi
-            continue
-        fi
-        
-        if [ -n "$SINGLE_PACKAGE" ] && [ "$package" != "$SINGLE_PACKAGE" ]; then
-            continue
-        fi
-        
-        migrate_direct_file "$package" "$target" "$source"
-    done
+    # Migrate mimeapps.list and kdeglobals (direct file mappings)
+    if [ -z "$SINGLE_PACKAGE" ] || [ "$SINGLE_PACKAGE" = "mimeapps.list" ]; then
+        migrate_direct_file "mimeapps.list" ".config/mimeapps.list"
+    fi
+    if [ -z "$SINGLE_PACKAGE" ] || [ "$SINGLE_PACKAGE" = "kdeglobals" ]; then
+        migrate_direct_file "kdeglobals" ".config/kdeglobals"
+    fi
     
     # Migrate zsh (if not filtered)
     if [ -z "$SINGLE_PACKAGE" ] || [ "$SINGLE_PACKAGE" = "zsh" ]; then
