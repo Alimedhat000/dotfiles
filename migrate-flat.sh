@@ -131,9 +131,9 @@ migrate_config_package() {
         # Remove the now-empty .config directory
         run_cmd "rmdir '$package_dir/.config'"
         
-        # Create proxy symlink: package/.config -> ..
-        # So package/.config/dolphinrc -> ../dolphinrc
-        run_cmd "ln -s '..' '$package_dir/.config'"
+        # Create proxy symlink using ABSOLUTE path to avoid symlink chain issues
+        # package/.config -> $REPO_DIR/$package (absolute)
+        run_cmd "ln -s '$package_dir' '$package_dir/.config'"
         
         # Stage the symlink
         run_cmd "git -C '$REPO_DIR' add '$package_dir/.config'"
@@ -176,10 +176,10 @@ migrate_config_package() {
     run_cmd "rmdir '$nested_path'" 
     run_cmd "rmdir '$package_dir/.config'"
     
-    # Create proxy symlink: package/.config/package -> ../..
-    # This makes stow symlinks continue to work
+    # Create proxy symlink using ABSOLUTE path to avoid symlink chain issues
+    # package/.config/package -> $REPO_DIR/$package (absolute)
     run_cmd "mkdir -p '$package_dir/.config'"
-    run_cmd "ln -s '../..' '$package_dir/.config/$package'"
+    run_cmd "ln -s '$package_dir' '$package_dir/.config/$package'"
     
     # Stage the symlink
     run_cmd "git -C '$REPO_DIR' add '$package_dir/.config/$package'"
@@ -257,9 +257,9 @@ migrate_system() {
         run_cmd "git -C '$REPO_DIR' mv '$item' '$system_dir/'"
     done
     
-    # Remove empty .config and create proxy symlink
+    # Remove empty .config and create proxy symlink using ABSOLUTE path
     run_cmd "rmdir '$nested_dir'"
-    run_cmd "ln -s '..' '$system_dir/.config'"
+    run_cmd "ln -s '$system_dir' '$system_dir/.config'"
     run_cmd "git -C '$REPO_DIR' add '$system_dir/.config'"
     
     if [ "$DRY_RUN" = false ]; then
@@ -314,10 +314,10 @@ show_result() {
     echo
     echo "Before: nvim/.config/nvim/init.lua"
     echo "After:  nvim/init.lua"
-    echo "        nvim/.config/nvim -> ../..  (proxy symlink)"
+    echo "        nvim/.config/nvim -> $REPO_DIR/nvim  (absolute proxy symlink)"
     echo
     echo "Your ~/.config/nvim symlink still works because:"
-    echo "  ~/.config/nvim -> ../dotfiles/nvim/.config/nvim -> ../.. -> nvim/"
+    echo "  ~/.config/nvim -> ../dotfiles/nvim/.config/nvim -> $REPO_DIR/nvim/"
     echo
     
     local current_branch
