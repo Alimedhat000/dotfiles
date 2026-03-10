@@ -33,6 +33,7 @@ plugins=(
   fzf-tab
   you-should-use
   zsh-history-substring-search
+  zsh-vi-mode
 )
 
 source $ZSH/oh-my-zsh.sh
@@ -118,6 +119,24 @@ alias ff='fastfetch'
 alias http='curlie'
 
 alias open='xdg-open'
+
+omo() {
+  local config_file="$HOME/.config/opencode/opencode.json"
+  local updated_json
+
+  updated_json=$(jq '
+    .plugin = (
+      (.plugin // [])
+      | if any(.[]; test("^oh-my-opencode(@.*)?$")) then
+          .
+        else
+          . + ["oh-my-opencode@latest"]
+        end
+    )
+  ' "$config_file")
+
+  OPENCODE_CONFIG_CONTENT="$updated_json" opencode "$@"
+}
 
 #alias curl='curl --proto-default https'
 
@@ -244,3 +263,18 @@ eval "$(direnv hook zsh)"
 # opencode
 export PATH=/home/ali/.opencode/bin:$PATH
 export PATH=/home/ali/.cargo/bin/:$PATH
+
+# bun completions
+[ -s "/home/ali/.bun/_bun" ] && source "/home/ali/.bun/_bun"
+
+# bun
+export BUN_INSTALL="$HOME/.bun"
+export PATH="$BUN_INSTALL/bin:$PATH"
+
+ZVM_SYSTEM_CLIPBOARD_ENABLED=true
+
+export PATH="$HOME/matlab/bin:$PATH"
+
+export PATH=/usr/local/texlive/2025/bin/x86_64-linux:$PATH
+export MANPATH=/usr/local/texlive/2025/texmf-dist/doc/man:$MANPATH
+export INFOPATH=/usr/local/texlive/2025/texmf-dist/doc/info:$INFOPATH

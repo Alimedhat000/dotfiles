@@ -25,3 +25,8 @@ post_hook = 'mkdir -p $HOME/.config/cava/themes; ln -nfs $HOME/.config/matugen/g
 input_path = '~/.config/matugen/templates/fastfetch.jsonc'
 output_path = '~/.config/matugen/generated/fastfetch.jsonc'
 post_hook = 'ln -nfs $HOME/.config/matugen/generated/fastfetch.jsonc $HOME/.config/fastfetch/config.jsonc'
+#
+# [templates.spotify_player]
+# input_path = '~/.config/matugen/templates/theme.toml'
+# output_path = '~/.config/matugen/generated/theme.toml'
+# post_hook = 'ln -nfs $HOME/.config/matugen/generated/theme.toml $HOME/.config/spotify-player/theme.toml'

@@ -9,7 +9,9 @@
     "completedPomodoros-2026-02-06": 1
   },
   "emojiLauncher": {
-    "enabled": true
+    "enabled": true,
+    "trigger": ":",
+    "noTrigger": false
   },
   "commandRunner": {
     "enabled": true
@@ -39,5 +41,15 @@
     "enabled": true,
     "trigger": "{",
     "editorMode": "VSCode"
+  },
+  "dankHyprlandWindows": {
+    "enabled": true
+  },
+  "githubHeatmap": {
+    "enabled": false
+  },
+  "wallpaperShufflerPlugin": {
+    "enabled": true,
+    "wallpaperPath": "~/Pictures/wallpapers"
   }
 }

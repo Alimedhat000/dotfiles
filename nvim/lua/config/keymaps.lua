@@ -45,3 +45,8 @@ keymap.set("n", "<C-z>", "<Nop>", opts)
 -- Make Ctrl Backspace delete one word in insert mode
 keymap.set("i", "<C-h>", "<C-w>", { noremap = true, silent = true })
 keymap.set("i", "<C-BS>", "<C-w>", { noremap = true, silent = true })
+
+-- Delete To Void Register
+keymap.set("n", "dd", '"_dd')
+keymap.set("n", "d", '"_d')
+keymap.set("v", "d", '"_d')

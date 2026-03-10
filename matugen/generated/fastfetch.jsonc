@@ -8,13 +8,13 @@
       "left": 3
     },
     "color": {
-      "1": "#8bd0ef",
-      "2": "#b4cad6"
+      "1": "#adc6ff",
+      "2": "#bfc6dc"
     }
   },
   "display": {
     "color": {
-      "separator": "#c6c2ea"
+      "separator": "#debcdf"
     },
     "separator": " ",
     "constants": ["   »»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»"]
@@ -24,50 +24,50 @@
     {
       "type": "kernel",
       "key": "   Distro   ",
-      "keyColor": "#8bd0ef",
+      "keyColor": "#adc6ff",
       "format": "{2}"
     },
     {
       "type": "uptime",
       "key": "   Uptime   ",
-      "keyColor": "#b4cad6",
+      "keyColor": "#bfc6dc",
     },
     {
       "type": "shell",
       "key": "   Shell    ",
-      "keyColor": "#c6c2ea",
+      "keyColor": "#debcdf",
       "format" : "{}"
     },
     {
       "type": "terminal",
       "key": "   Terminal ",
-      "keyColor": "#b4cad6",
+      "keyColor": "#bfc6dc",
       "format": "{1}"
     },
     {
       "type": "cpu",
       "key": "   CPU      ",
-      "keyColor": "#8bd0ef"
+      "keyColor": "#adc6ff"
 
       ,"format": "{1}"
     },
     {
       "type": "gpu",
       "key": "   GPU      ",
-      "keyColor": "#c6c2ea",
+      "keyColor": "#debcdf",
       "format": "{2}",
       "hideType": "integrated",
     },
     {
       "type": "memory",
       "key": "   RAM      ",
-      "keyColor": "#8bd0ef",
+      "keyColor": "#adc6ff",
 
     },
     {
       "type": "disk",
       "key": "   Disk     ",
-      "keyColor": "#b4cad6"
+      "keyColor": "#bfc6dc"
     },
     {
       "type": "colors",
