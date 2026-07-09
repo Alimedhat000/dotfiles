@@ -298,7 +298,7 @@
       "enabled": true
     }
   ],
-  "networkPreference": "ethernet",
+  "networkPreference": "auto",
   "iconThemeDark": "System Default",
   "iconThemeLight": "System Default",
   "iconThemePerMode": false,
@@ -347,7 +347,7 @@
   "notepadEdgeGap": 0,
   "soundsEnabled": true,
   "useSystemSoundTheme": false,
-  "soundLogin": false,
+  "soundLogin": true,
   "soundNewNotification": true,
   "soundVolumeChanged": true,
   "soundPluggedIn": true,
@@ -803,6 +803,9 @@
     },
     "dms_notepad": {
       "enabled": true
+    },
+    "dms_clipboard_search": {
+      "trigger": "cb"
     }
   },
   "clipboardClickToPaste": false,
