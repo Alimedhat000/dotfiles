@@ -1,7 +1,13 @@
 [Added Associations]
+application/pdf=firefox.desktop;
 image/png=loupe-3.desktop;
 
 [Default Applications]
+application/pdf=firefox.desktop;
+application/x-pka=CiscoPacketTracer-9.0.0.desktop
+application/x-pksz=CiscoPacketTracer-9.0.0.desktop
+application/x-pkt=CiscoPacketTracer-9.0.0.desktop
+application/x-pkz=CiscoPacketTracer-9.0.0.desktop
 image/bmp=org.gnome.Loupe.desktop
 image/gif=org.gnome.Loupe.desktop
 image/jpeg=org.gnome.Loupe.desktop
@@ -9,9 +15,12 @@ image/png=loupe-3.desktop;
 image/webp=org.gnome.Loupe.desktop
 text/html=firefox.desktop
 x-scheme-handler/about=firefox.desktop
-x-scheme-handler/discord=vesktop.desktop
+x-scheme-handler/bruno=bruno.desktop
+x-scheme-handler/discord=equibop.desktop
 x-scheme-handler/discord-831593107883032657=discord-831593107883032657.desktop
 x-scheme-handler/http=firefox.desktop
 x-scheme-handler/https=firefox.desktop
+x-scheme-handler/jetbrains=jetbrainsd.desktop
+x-scheme-handler/pttp=CiscoPacketTracerPtsa-9.0.0.desktop
+x-scheme-handler/readest=readest-handler.desktop
 x-scheme-handler/unknown=firefox.desktop
-x-scheme-handler/bruno=bruno.desktop

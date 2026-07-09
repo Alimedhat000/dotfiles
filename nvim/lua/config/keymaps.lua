@@ -16,10 +16,10 @@ keymap.set("n", "ss", ":split<Return>", opts)
 keymap.set("n", "sv", ":vsplit<Return>", opts)
 
 --move between splits
-keymap.set("n", "<C-h>", "<C-w>h")
-keymap.set("n", "<C-j>", "<C-w>j")
-keymap.set("n", "<C-k>", "<C-w>k")
-keymap.set("n", "<C-l>", "<C-w>l")
+-- keymap.set("n", "<C-h>", "<C-w>h")
+-- keymap.set("n", "<C-j>", "<C-w>j")
+-- keymap.set("n", "<C-k>", "<C-w>k")
+-- keymap.set("n", "<C-l>", "<C-w>l")
 
 --Better Esc
 keymap.set("i", "jj", "<Esc>", opts)

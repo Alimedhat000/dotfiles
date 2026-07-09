@@ -1,22 +1,21 @@
 return {
   "lervag/vimtex",
-  lazy = false, -- we don't want to lazy load VimTeX
+  lazy = false,
   init = function()
-    -- Use latexmk as the compiler
     vim.g.vimtex_compiler_method = "latexmk"
     vim.g.vimtex_view_method = "zathura"
-    -- Configure latexmk for XeLaTeX
+
     vim.g.vimtex_compiler_latexmk = {
       executable = "latexmk",
+      out_dir = "build", -- ← tell VimTeX where the PDF lands
       options = {
-        "-xelatex", -- use XeLaTeX
-        "-synctex=1", -- enable synctex
+        "-xelatex",
+        "-synctex=1",
         "-interaction=nonstopmode",
         "-file-line-error",
-        "-outdir=build",
       },
     }
 
-    vim.keymap.set("n", "<leader>ll", "<cmd>VimtexCompile<return>")
+    vim.keymap.set("n", "<leader>ll", "<cmd>VimtexCompile<cr>")
   end,
 }

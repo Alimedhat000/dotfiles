@@ -69,7 +69,7 @@ fi
 alias ls='eza --icons --group-directories-first'
 alias ll='eza -l --icons --group-directories-first'
 alias la='eza -la --icons --group-directories-first'
-alias tree='eza --tree --icons'
+alias tree='eza --tree --icons --all --ignore-glob="node_modules|dist|.git|.turbo"'
 
 alias nv="nvim"
 alias sane="stty sane"
@@ -112,7 +112,7 @@ alias cwd='pwd | wl-copy && echo "$(pwd)"'
 alias poke='pokemon-colorscripts'
 
 # Better cat
-alias cat='bat --theme="Visual Studio Dark+"'
+alias bat='bat --theme="Visual Studio Dark+"'
 
 alias ff='fastfetch'
 
@@ -138,6 +138,14 @@ omo() {
   OPENCODE_CONFIG_CONTENT="$updated_json" opencode "$@"
 }
 
+# export FZF_CTRL_R_OPTS="
+#   --preview 'echo {}' --preview-window up:3:hidden:wrap
+#   --bind 'ctrl-/:toggle-preview'
+#   --bind 'ctrl-y:execute-silent(echo -n {2..} | pbcopy)+abort'
+#   --color header:italic
+#   --header 'Press CTRL-Y to copy command into clipboard'"
+#
+setopt EXTENDED_HISTORY
 #alias curl='curl --proto-default https'
 
 # Colorized output
@@ -210,35 +218,47 @@ export NVM_DIR="$HOME/.nvm"
 export DATABASE_PASSWORD="1234"
 
 # pnpm
-export PNPM_HOME="/home/eren/.local/share/pnpm"
+export PNPM_HOME="/home/ali/.local/share/pnpm"
 case ":$PATH:" in
   *":$PNPM_HOME:"*) ;;
   *) export PATH="$PNPM_HOME:$PATH" ;;
 esac
 
-export FLYCTL_INSTALL="/home/eren/.fly"
-export PATH="$FLYCTL_INSTALL/bin:$PATH"
 
 export PATH="$HOME/.local/share/bob/nvim-bin:$PATH"
 
 # Initialize Starship (comment this out if you want to use Oh My Zsh themes instead)
 eval "$(starship init zsh)"
 
+#
+# # >>> conda initialize >>>
+# # !! Contents within this block are managed by 'conda init' !!
+# __conda_setup="$('/home/eren/miniconda3/bin/conda' 'shell.zsh' 'hook' 2>/dev/null)"
+# if [ $? -eq 0 ]; then
+#   eval "$__conda_setup"
+# else
+#   if [ -f "/home/eren/miniconda3/etc/profile.d/conda.sh" ]; then
+#     . "/home/eren/miniconda3/etc/profile.d/conda.sh"
+#   else
+#     export PATH="/home/eren/miniconda3/bin:$PATH"
+#   fi
+# fi
+# unset __conda_setup
+# # <<< conda initialize <<<
 
-# >>> conda initialize >>>
-# !! Contents within this block are managed by 'conda init' !!
-__conda_setup="$('/home/eren/miniconda3/bin/conda' 'shell.zsh' 'hook' 2>/dev/null)"
-if [ $? -eq 0 ]; then
-  eval "$__conda_setup"
-else
-  if [ -f "/home/eren/miniconda3/etc/profile.d/conda.sh" ]; then
-    . "/home/eren/miniconda3/etc/profile.d/conda.sh"
-  else
-    export PATH="/home/eren/miniconda3/bin:$PATH"
-  fi
-fi
-unset __conda_setup
-# <<< conda initialize <<<
+# function
+avd() {
+  emulator -avd "$1"
+}
+
+# autocomplete
+_avd_list() {
+  local avds
+  avds=(${(f)"$(emulator -list-avds 2>/dev/null)"})
+  _describe 'android avd' avds
+}
+
+compdef _avd_list avd
 
 export PATH=/usr/local/cuda/bin:$PATH
 export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
@@ -254,7 +274,7 @@ export PATH=$PATH:$ANDROID_HOME/platform-tools
 
 export PYENV_ROOT="$HOME/.pyenv"
 [[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"
-eval "$(pyenv init - bash)"
+eval "$(pyenv init - zsh)"
 
 export PATH="$HOME/.platformio/penv/bin:$PATH"
 
@@ -275,6 +295,77 @@ ZVM_SYSTEM_CLIPBOARD_ENABLED=true
 
 export PATH="$HOME/matlab/bin:$PATH"
 
-export PATH=/usr/local/texlive/2025/bin/x86_64-linux:$PATH
-export MANPATH=/usr/local/texlive/2025/texmf-dist/doc/man:$MANPATH
-export INFOPATH=/usr/local/texlive/2025/texmf-dist/doc/info:$INFOPATH
+export PATH=/usr/local/texlive/2026/bin/x86_64-linux:$PATH
+export MANPATH=/usr/local/texlive/2026/texmf-dist/doc/man:$MANPATH
+export INFOPATH=/usr/local/texlive/2026/texmf-dist/doc/info:$INFOPATH
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
+# export JAVA_HOME=/usr/lib/jvm/java-21-openjdk
+
+export PATH=$PATH:$HOME/.maestro/bin
+# [ -z "$TERM" ] && export TERM=xterm-256color
+
+export PATH=/home/ali/bin:$PATH
+
+[[ -e "/home/ali/lib/oracle-cli/lib/python3.11/site-packages/oci_cli/bin/oci_autocomplete.sh" ]] && source "/home/ali/lib/oracle-cli/lib/python3.11/site-packages/oci_cli/bin/oci_autocomplete.sh"
+#compdef pnpm
+###-begin-pnpm-completion-###
+if type compdef &>/dev/null; then
+  _pnpm_completion () {
+    local reply
+    local si=$IFS
+
+    IFS=$'\n' reply=($(COMP_CWORD="$((CURRENT-1))" COMP_LINE="$BUFFER" COMP_POINT="$CURSOR" SHELL=zsh pnpm completion-server -- "${words[@]}"))
+    IFS=$si
+
+    if [ "$reply" = "__tabtab_complete_files__" ]; then
+      _files
+    else
+      _describe 'values' reply
+    fi
+  }
+  # When called by the Zsh completion system, this will end with
+  # "loadautofunc" when initially autoloaded and "shfunc" later on, otherwise,
+  # the script was "eval"-ed so use "compdef" to register it with the
+  # completion system
+  if [[ $zsh_eval_context == *func ]]; then
+    _pnpm_completion "$@"
+  else
+    compdef _pnpm_completion pnpm
+  fi
+fi
+###-end-pnpm-completion-###
+
+#compdef opencode
+###-begin-opencode-completions-###
+#
+# yargs command completion script
+#
+# Installation: opencode completion >> ~/.zshrc
+#    or opencode completion >> ~/.zprofile on OSX.
+#
+_opencode_yargs_completions()
+{
+  local reply
+  local si=$IFS
+  IFS=$'
+' reply=($(COMP_CWORD="$((CURRENT-1))" COMP_LINE="$BUFFER" COMP_POINT="$CURSOR" opencode --get-yargs-completions "${words[@]}"))
+  IFS=$si
+  if [[ ${#reply} -gt 0 ]]; then
+    _describe 'values' reply
+  else
+    _default
+  fi
+}
+if [[ "'${zsh_eval_context[-1]}" == "loadautofunc" ]]; then
+  _opencode_yargs_completions "$@"
+else
+  compdef _opencode_yargs_completions opencode
+fi
+###-end-opencode-completions-###
+
+
+
+# Begin: PlatformIO Core completion support
+eval "$(_PIO_COMPLETE=zsh_source pio)"
+# End: PlatformIO Core completion support
+

@@ -17,7 +17,7 @@
     "enabled": true
   },
   "prayerTimes": {
-    "enabled": false
+    "enabled": true
   },
   "calculator": {
     "enabled": true,
@@ -46,7 +46,9 @@
     "enabled": true
   },
   "githubHeatmap": {
-    "enabled": false
+    "enabled": false,
+    "username": "Alimedhat000",
+    "refreshInterval": 300
   },
   "wallpaperShufflerPlugin": {
     "enabled": true,
