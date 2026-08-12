@@ -32,13 +32,26 @@ env = ELECTRON_OZONE_PLATFORM_HINT,auto
 env = XDG_MENU_PREFIX,arch-
 
 # ========================================
-# GPU: render on Intel iGPU (battery)
-# NVIDIA dGPU stays asleep (~0W) until an
-# app explicitly requests it via DRI_PRIME=1
+# NVIDIA-SPECIFIC ENVIRONMENT VARIABLES
 # ========================================
 
-# Restore from hyprland.conf.bak-nvidia to render on the NVIDIA GPU again
+# Core NVIDIA settings
+env = LIBVA_DRIVER_NAME,nvidia
+env = __GLX_VENDOR_LIBRARY_NAME,nvidia
 env = XDG_SESSION_TYPE,wayland
+env = GBM_BACKEND,nvidia-drm
+env = __GL_THREADED_OPTIMIZATIONS=1
+
+# Hardware cursor fix (prevents flickering)
+env = WLR_NO_HARDWARE_CURSORS,1
+
+# Performance and rendering
+env = __GL_GSYNC_ALLOWED,1
+env = __GL_VRR_ALLOWED,0
+env = WLR_DRM_NO_ATOMIC,1
+
+# CUDA/computation
+env = NVD_BACKEND,direct
 
 # ========================================
 # MONITOR CONFIGURATION

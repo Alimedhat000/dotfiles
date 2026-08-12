@@ -34,6 +34,7 @@ plugins=(
   you-should-use
   zsh-history-substring-search
   zsh-vi-mode
+  artisan
 )
 
 source $ZSH/oh-my-zsh.sh
@@ -72,6 +73,7 @@ alias la='eza -la --icons --group-directories-first'
 alias tree='eza --tree --icons --all --ignore-glob="node_modules|dist|.git|.turbo"'
 
 alias nv="nvim"
+alias oc="opencode"
 alias sane="stty sane"
 alias lg="lazygit"
 
@@ -274,7 +276,7 @@ export PATH=$PATH:$ANDROID_HOME/platform-tools
 
 export PYENV_ROOT="$HOME/.pyenv"
 [[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"
-eval "$(pyenv init - zsh)"
+eval "$(pyenv init - --no-rehash zsh)"
 
 export PATH="$HOME/.platformio/penv/bin:$PATH"
 
@@ -369,3 +371,9 @@ fi
 eval "$(_PIO_COMPLETE=zsh_source pio)"
 # End: PlatformIO Core completion support
 
+export PATH="/home/ali/.config/herd-lite/bin:$PATH"
+export PHP_INI_SCAN_DIR="/home/ali/.config/herd-lite/bin:$PHP_INI_SCAN_DIR"
+
+if [ "$TERM" = "xterm-kitty" ]; then
+    export TERM=xterm-256color
+fi

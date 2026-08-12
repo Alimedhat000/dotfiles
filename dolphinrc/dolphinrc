@@ -1,6 +1,10 @@
 [DetailsMode]
 PreviewSize=32
 
+[ExtractDialog]
+2 screens: Window-Maximized=true
+DirHistory[$e]=$HOME/Downloads/Maps/
+
 [General]
 GlobalViewProps=false
 ShowFullPath=true
@@ -8,7 +12,7 @@ ShowStatusBar=FullWidth
 Version=202
 
 [IconsMode]
-PreviewSize=128
+PreviewSize=112
 
 [KFileDialog Settings]
 Places Icons Auto-resize=false
